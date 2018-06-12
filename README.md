@@ -2,6 +2,7 @@
 Ping sweep subnet, recreating some functionality from nmap
 
 optional arguments:
+  
   -h, --help  show help message and exit
   
   -s [IP]     Sweep a subnet
