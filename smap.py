@@ -1,5 +1,5 @@
 """
-@author: Scott Cuthbert <scottc.engineer@gmail.com>
+@author: Scott Cuthbert <scott.cuthbert@roche.com>
 
 [changelog]
 
@@ -13,7 +13,6 @@ Better user input checking/error handling, as always
 Fix globals issue to clean up ping_check function arguments
 Clean up imports
 Figure out if the script is wasting time pinging network and broadcast adds
-Add features?
 
 """
 
@@ -28,6 +27,7 @@ needShell = False
 pingArg = ""
 fqdn = False
 findOffline = False
+onlyFQDNs = False
 
 
 def main():
@@ -43,17 +43,22 @@ def main():
         print("\nError: %s\nPlease check inputs and try again.\n" % msg)
         exit()
 
+    global fqdn
+    global findOffline
+    global onlyFQDNs
+
     if args.FQDN:
-        global fqdn
         fqdn = True
     if args.OFFLINE:
-        global findOffline
         findOffline = True
+    if args.ONLYFQDN:
+        onlyFQDNs = True
+        fqdn = True
 
     # find out if it actually spawns this many
     print("Spawning %s processes to sweep subnet %s" % (num, subnet))
 
-    report = multi_echo(subnet, findOffline)
+    report = multi_echo(subnet, findOffline, onlyFQDNs)
     if findOffline:
         print("Report of OFFLINE hosts:\n")
     else:
@@ -65,7 +70,7 @@ def main():
 
 # TODO figure out why my globals are fucky
 # create subprocess to ping check host, return result
-def ping_check(host, pingArg, fqdn, offline, send_end):
+def ping_check(host, pingArg, fqdn, offline, namesonly, send_end):
 
     command = ("ping %s %s" % (pingArg, host))
     out = subprocess.run(command, shell=needShell,
@@ -81,7 +86,11 @@ def ping_check(host, pingArg, fqdn, offline, send_end):
                     name = ("\t| %s" % name[0])
                 except Exception:
                     name = ("\t| ")
-            result = ("%s%s" % (host, name))
+            if namesonly:
+                if name == ("\t| "):
+                    result = ""
+                else:
+                    result = ("%s%s" % (host, name))
         else:
             result = ""
     else:
@@ -93,7 +102,11 @@ def ping_check(host, pingArg, fqdn, offline, send_end):
                     name = ("\t| %s" % name[0])
                 except Exception:  # really dude?
                     name = ("\t| ")
-            result = ("%s%s" % (host, name))
+            if namesonly:
+                if name == ("\t| "):
+                    result = ""
+                else:
+                    result = ("%s%s" % (host, name))
         else:
             result = ""
 
@@ -101,7 +114,7 @@ def ping_check(host, pingArg, fqdn, offline, send_end):
 
 
 # spawn a ping_check function process for each host in subnet
-def multi_echo(subnet, off):
+def multi_echo(subnet, off, names):
 
     jobs = []
     outlist = []
@@ -109,7 +122,8 @@ def multi_echo(subnet, off):
 
     for host in subnet.hosts():
         recv_end, send_end = multiprocessing.Pipe(False)
-        p = magic(target=ping_check, args=(host, pingArg, fqdn, off, send_end))
+        p = magic(target=ping_check, args=(host, pingArg, fqdn, off,
+                                           names, send_end))
         jobs.append(p)
         outlist.append(recv_end)
         p.start()
@@ -134,6 +148,9 @@ def parser():
     # -f turns on hostname lookups
     parser.add_argument('-f', dest='FQDN', action='store_true',
                         default=False, help='Return FQDNs')
+    # -F turns on hostname lookups and only sets hostname prints
+    parser.add_argument('-F', dest='ONLYFQDN', action='store_true',
+                        default=False, help='Return only FQDN responses')
     # -o flags for finding offline hosts
     parser.add_argument('-o', dest='OFFLINE', action='store_true',
                         default=False, help="Return nodes that don't respond")
